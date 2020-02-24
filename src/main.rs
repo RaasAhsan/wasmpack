@@ -1,9 +1,9 @@
 
-mod assembler;
+mod text;
 mod code;
 
 fn main() {
     println!("wasmpack");
 
-    assembler::assemble();
+    text::assemble();
 }
