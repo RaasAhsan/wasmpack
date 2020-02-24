@@ -9,30 +9,77 @@ use std::str::FromStr;
 
 // The next token is taken to be the longest possible sequence of characters defined by the grammar.
 
+// How to express alternatives of a production more effectively?
+
 type Lex<A> = Result<A, String>;
+
+struct State {
+    input: String,
+    cursor: usize,
+    tokens: Vec<Token>
+}
+
+impl State {
+
+    fn advance(&mut self, offset: usize) {
+        self.cursor += offset;
+    }
+
+    fn push_token(&mut self, token: Token) {
+        self.tokens.push(token);
+    }
+
+    fn rest(&self) -> String {
+        self.input.chars().skip(self.cursor).collect()
+    }
+
+    fn eof(&self) -> bool {
+        self.cursor == self.input.len()
+    }
+
+}
 
 pub enum Token {
     Keyword(Keyword),
     // TODO: Are 32-bit types sufficient here?
     Unsigned(u32),
     Signed(i32),
-    Floating(f32),
-    String(),
+    Float(f32),
+    String(String),
+    Id(String),
     OpenParen,
     CloseParen,
-    Reserved(Reserved)
+    Reserved(String)
 }
 
 pub struct Keyword {
 
 }
 
-pub struct Reserved {
+fn lex(input: String) -> Vec<Token> {
+    let mut state = State {
+        input: input.clone(),
+        cursor: 0,
+        tokens: vec![]
+    };
 
+    state.tokens
 }
 
-fn lex_token(input: &str) -> u32 {
-    234
+fn lex_token(state: &mut State) -> bool {
+    return if state.rest().starts_with("(") {
+        state.advance(1);
+        state.push_token(Token::OpenParen);
+        true
+    } else if state.rest().starts_with(")") {
+        state.advance(1);
+        state.push_token(Token::CloseParen);
+        true
+    } else if state.rest().starts_with("$") {
+        true
+    } else {
+        false
+    }
 }
 
 fn lex_keyword(input: &str) -> u32 {
@@ -43,37 +90,54 @@ fn lex_reserved(input: &str) -> u32 {
     34
 }
 
+fn lex_id(state: &mut State) -> bool {
+    let re = Regex::new(r"^\$[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]+").unwrap();
+
+    match re.find(state.rest().as_ref()) {
+        None => false,
+        Some(mat) => {
+            let str = mat.as_str();
+            state.advance(str.len());
+            state.push_token(Token::Id(str.to_string()));
+            true
+        }
+    }
+}
+
 // TODO: Use lazy_static to avoid compiling the regex on every invocation
 // TODO: The regex should admit underscores
-fn lex_unsigned(input: &mut String) -> Lex<u32> {
-    let a1 = lex_dec(input);
-    if a1.is_ok() {
-        return a1;
-    }
-
-    let a2 = lex_hex(input);
-    if a2.is_ok() {
-        return a2;
-    }
-
-    return Err("Failed to parse unsigned integer.".into());
-}
-
-
-fn lex_dec(input: &mut String) -> Lex<u32> {
+fn lex_unsigned(state: &mut State) -> bool {
     let re = Regex::new(r"^\d+").unwrap();
-    let mat = re.find(input).ok_or("Invalid u32")?;
-    let str = mat.as_str();
-    let z = u32::from_str_radix(str, 10).map_err(|_| "Invalid u32.".to_string())?;
-    input.replace_range(..str.len(), "");
-    return Ok(z);
-}
+    match re.find(state.rest().as_ref()) {
+        None => {},
+        Some(mat) => {
+            let str = mat.as_str();
+            match u32::from_str_radix(str, 10) {
+                Err(e) => {},
+                Ok(z) => {
+                    state.advance(str.len());
+                    state.push_token(Token::Unsigned(z));
+                    return true;
+                }
+            }
+        }
+    }
 
-fn lex_hex(input: &mut String) -> Lex<u32> {
-    let re = Regex::new(r"^0x[0-9A-Fa-f]+").unwrap();
-    let mat = re.find(input).ok_or("Invalid u32")?;
-    let str = mat.as_str();
-    let z = u32::from_str_radix(str, 16).map_err(|_| "Invalid u32.".to_string())?;
-    input.replace_range(..str.len(), "");
-    return Ok(z);
+    let re2 = Regex::new(r"^0x[0-9A-Fa-f]+").unwrap();
+    match re2.find(state.rest().as_ref()) {
+        None => {},
+        Some(mat) => {
+            let str = mat.as_str();
+            match u32::from_str_radix(str, 16) {
+                Err(e) => {},
+                Ok(z) => {
+                    state.advance(str.len());
+                    state.push_token(Token::Unsigned(z));
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
 }
