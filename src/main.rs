@@ -3,7 +3,8 @@ mod text;
 mod code;
 
 fn main() {
-    println!("wasmpack");
+    let input = "(( ( (   (12423)))))))))";
 
-    text::assemble();
+    let result = text::lexer::lex(input.to_string());
+    println!("{:?}", result);
 }
