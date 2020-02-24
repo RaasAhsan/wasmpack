@@ -9,7 +9,7 @@ use std::str::FromStr;
 
 // The next token is taken to be the longest possible sequence of characters defined by the grammar.
 
-type Lex<A> = Result<(A, usize), String>;
+type Lex<A> = Result<A, String>;
 
 pub enum Token {
     Keyword(Keyword),
@@ -48,7 +48,6 @@ fn lex_reserved(input: &str) -> u32 {
 fn lex_unsigned(input: &mut String) -> Lex<u32> {
     let a1 = lex_dec(input);
     if a1.is_ok() {
-        input.replace_range(..a1.unwrap().1, "");
         return a1;
     }
 
@@ -61,18 +60,20 @@ fn lex_unsigned(input: &mut String) -> Lex<u32> {
 }
 
 
-fn lex_dec(input: &String) -> Lex<u32> {
+fn lex_dec(input: &mut String) -> Lex<u32> {
     let re = Regex::new(r"^\d+").unwrap();
     let mat = re.find(input).ok_or("Invalid u32")?;
     let str = mat.as_str();
     let z = u32::from_str_radix(str, 10).map_err(|_| "Invalid u32.".to_string())?;
-    return Ok((z, str.len()));
+    input.replace_range(..str.len(), "");
+    return Ok(z);
 }
 
-fn lex_hex(input: &String) -> Lex<u32> {
+fn lex_hex(input: &mut String) -> Lex<u32> {
     let re = Regex::new(r"^0x[0-9A-Fa-f]+").unwrap();
     let mat = re.find(input).ok_or("Invalid u32")?;
     let str = mat.as_str();
     let z = u32::from_str_radix(str, 16).map_err(|_| "Invalid u32.".to_string())?;
-    return Ok((z, str.len()));
+    input.replace_range(..str.len(), "");
+    return Ok(z);
 }
