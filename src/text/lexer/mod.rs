@@ -10,6 +10,7 @@ use regex::Regex;
 
 // How to express alternatives of a production more effectively?
 // Structure: One function for each nonterminal. One function per alternative for a production. Can be collapsed into one if it makes sense.
+// TODO: Regex structure is heavily duplicated
 
 type Lex<A> = Option<(A, usize)>;
 
@@ -36,7 +37,7 @@ impl State {
 
 #[derive(Debug)]
 pub enum Token {
-    Keyword(Keyword),
+    Keyword(String),
     // TODO: Are 32-bit types sufficient here?
     Unsigned(u32),
     Signed(i32),
@@ -46,11 +47,6 @@ pub enum Token {
     LeftParen,
     RightParen,
     Reserved(String)
-}
-
-#[derive(Debug)]
-pub struct Keyword {
-
 }
 
 pub fn lex(input: String) -> Result<Vec<Token>, String> {
@@ -118,10 +114,24 @@ fn choose<A>(current: Lex<A>, next: Lex<A>) -> Lex<A> {
 
 fn lex_token(state: &State) -> Lex<Token> {
     let mut token: Lex<Token> = None;
+    token = choose(token, lex_keyword(state));
     token = choose(token, lex_unsigned(state));
+    token = choose(token, lex_id(state));
     token = choose(token, lex_left_paren(state));
     token = choose(token, lex_right_paren(state));
+    token = choose(token, lex_reserved(state));
     token
+}
+
+fn lex_keyword(state: &State) -> Lex<Token> {
+    let re = Regex::new(r"^[a-z][0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]*").unwrap();
+    match re.find(state.rest().as_ref()) {
+        None => None,
+        Some(mat) => {
+            let str = mat.as_str();
+            Some((Token::Keyword(str.to_string()), str.len()))
+        }
+    }
 }
 
 fn lex_left_paren(state: &State) -> Lex<Token> {
@@ -140,21 +150,24 @@ fn lex_right_paren(state: &State) -> Lex<Token> {
     }
 }
 
-fn lex_keyword(input: &str) -> u32 {
-    234
+fn lex_reserved(state: &State) -> Lex<Token> {
+    let re = Regex::new(r"^[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]+").unwrap();
+    match re.find(state.rest().as_ref()) {
+        None => None,
+        Some(mat) => {
+            let str = mat.as_str();
+            Some((Token::Reserved(str.to_string()), str.len()))
+        }
+    }
 }
 
-fn lex_reserved(input: &str) -> u32 {
-    34
-}
-
-fn lex_id(state: &State) -> Lex<String> {
+fn lex_id(state: &State) -> Lex<Token> {
     let re = Regex::new(r"^\$[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]+").unwrap();
     match re.find(state.rest().as_ref()) {
         None => None,
         Some(mat) => {
             let str = mat.as_str();
-            Some((str.to_string(), str.len()))
+            Some((Token::Id(str.to_string()), str.len()))
         }
     }
 }
