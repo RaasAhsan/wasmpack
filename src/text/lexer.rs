@@ -11,22 +11,17 @@ use regex::Regex;
 // How to express alternatives of a production more effectively?
 // Structure: One function for each nonterminal. One function per alternative for a production. Can be collapsed into one if it makes sense.
 
-type Lex<A> = Result<A, String>;
+type Lex<A> = Option<(A, usize)>;
 
 struct State {
     input: String,
-    cursor: usize,
-    tokens: Vec<Token>
+    cursor: usize
 }
 
 impl State {
 
     fn advance(&mut self, offset: usize) {
         self.cursor += offset;
-    }
-
-    fn push_token(&mut self, token: Token) {
-        self.tokens.push(token);
     }
 
     fn rest(&self) -> String {
@@ -61,18 +56,27 @@ pub struct Keyword {
 pub fn lex(input: String) -> Result<Vec<Token>, String> {
     let mut state = State {
         input: input.clone(),
-        cursor: 0,
-        tokens: vec![]
+        cursor: 0
     };
 
+    let mut tokens: Vec<Token> = vec![];
     let mut no_match = false;
     while !state.eof() && !no_match {
-        if lex_token(&mut state) {
-            continue;
+        match lex_token(&state) {
+            None => {},
+            Some(t) => {
+                tokens.push(t.0);
+                state.advance(t.1);
+                continue;
+            }
         }
 
-        if lex_space(&mut state) {
-            continue;
+        match lex_space(&state) {
+            None => {},
+            Some(t) => {
+                state.advance(t.1);
+                continue;
+            }
         }
 
         no_match = true;
@@ -81,57 +85,58 @@ pub fn lex(input: String) -> Result<Vec<Token>, String> {
     if no_match {
         Err("Token not matched".to_string())
     } else {
-        Ok(state.tokens)
+        Ok(tokens)
     }
 }
 
 // TODO: include comments
-fn lex_space(state: &mut State) -> bool {
+fn lex_space(state: &State) -> Lex<()> {
     let re = Regex::new(r"^[\n\t\r ]+").unwrap();
 
     match re.find(state.rest().as_ref()) {
-        None => false,
+        None => None,
         Some(mat) => {
             let str = mat.as_str();
-            state.advance(str.len());
-            true
+            Some(((), str.len()))
         }
     }
 }
 
-fn lex_token(state: &mut State) -> bool {
-    if lex_unsigned(state) {
-        return true;
+fn choose<A>(current: Lex<A>, next: Lex<A>) -> Lex<A> {
+    match current {
+        None => next,
+        Some(c) => match next {
+            None => Some(c),
+            Some(n) => if c.1 >= n.1 {
+                Some(c)
+            } else {
+                Some(n)
+            }
+        }
     }
-
-    if lex_left_paren(state) {
-        return true;
-    }
-
-    if lex_right_paren(state) {
-        return true;
-    }
-
-    return false;
 }
 
-fn lex_left_paren(state: &mut State) -> bool {
+fn lex_token(state: &State) -> Lex<Token> {
+    let mut token: Lex<Token> = None;
+    token = choose(token, lex_unsigned(state));
+    token = choose(token, lex_left_paren(state));
+    token = choose(token, lex_right_paren(state));
+    token
+}
+
+fn lex_left_paren(state: &State) -> Lex<Token> {
     if state.rest().starts_with("(") {
-        state.advance(1);
-        state.push_token(Token::LeftParen);
-        true
+        Some((Token::LeftParen, 1))
     } else {
-        false
+        None
     }
 }
 
-fn lex_right_paren(state: &mut State) -> bool {
+fn lex_right_paren(state: &State) -> Lex<Token> {
     if state.rest().starts_with(")") {
-        state.advance(1);
-        state.push_token(Token::LeftParen);
-        true
+        Some((Token::RightParen, 1))
     } else {
-        false
+        None
     }
 }
 
@@ -143,56 +148,50 @@ fn lex_reserved(input: &str) -> u32 {
     34
 }
 
-fn lex_id(state: &mut State) -> bool {
+fn lex_id(state: &State) -> Lex<String> {
     let re = Regex::new(r"^\$[0-9A-Za-z!#$%&'*+\-./:<=>?@\\^_`|~]+").unwrap();
-
     match re.find(state.rest().as_ref()) {
-        None => false,
+        None => None,
         Some(mat) => {
             let str = mat.as_str();
-            state.advance(str.len());
-            state.push_token(Token::Id(str.to_string()));
-            true
+            Some((str.to_string(), str.len()))
         }
     }
 }
 
 // TODO: Use lazy_static to avoid compiling the regex on every invocation
 // TODO: The regex should admit underscores
-// TODO: Take the longer of the two
-// input case (((((12423)))0xff))))))
-fn lex_unsigned(state: &mut State) -> bool {
+fn lex_unsigned(state: &State) -> Lex<Token> {
+    let mut u: Lex<u32> = None;
+    u = choose(u, lex_unsigned_dec(state));
+    u = choose(u, lex_unsigned_hex(state));
+    u.map(|n| (Token::Unsigned(n.0), n.1))
+}
+
+fn lex_unsigned_dec(state: &State) -> Lex<u32> {
     let re = Regex::new(r"^[0-9]+").unwrap();
     match re.find(state.rest().as_ref()) {
-        None => {},
+        None => None,
         Some(mat) => {
             let str = mat.as_str();
             match u32::from_str_radix(str, 10) {
-                Err(e) => {},
-                Ok(z) => {
-                    state.advance(str.len());
-                    state.push_token(Token::Unsigned(z));
-                    return true;
-                }
+                Err(e) => None,
+                Ok(z) => Some((z, str.len()))
             }
         }
     }
+}
 
+fn lex_unsigned_hex(state: &State) -> Lex<u32> {
     let re2 = Regex::new(r"^0x[0-9A-Fa-f]+").unwrap();
     match re2.find(state.rest().as_ref()) {
-        None => {},
+        None => None,
         Some(mat) => {
             let str = mat.as_str();
-            match u32::from_str_radix(str, 16) {
-                Err(e) => {},
-                Ok(z) => {
-                    state.advance(str.len());
-                    state.push_token(Token::Unsigned(z));
-                    return true;
-                }
+            match u32::from_str_radix(&str[2..], 16) {
+                Err(e) => None,
+                Ok(z) => Some((z, str.len()))
             }
         }
     }
-
-    return false;
 }
