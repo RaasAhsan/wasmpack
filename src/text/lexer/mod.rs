@@ -1,4 +1,5 @@
 use regex::Regex;
+use crate::text::Token;
 
 // The lexer consumes a stream of Unicode characters and produces a stream of tokens that represent lexemes. Whitespace tokens are ignored on their own.
 // Unicode characters may only appear in string literals and comments; the grammar is otherwise formed from UTF-8 characters.
@@ -33,20 +34,6 @@ impl State {
         self.cursor == self.input.len()
     }
 
-}
-
-#[derive(Debug)]
-pub enum Token {
-    Keyword(String),
-    // TODO: Are 32-bit types sufficient here?
-    Unsigned(u32),
-    Signed(i32),
-    Float(f32),
-    String(String),
-    Id(String),
-    LeftParen,
-    RightParen,
-    Reserved(String)
 }
 
 pub fn lex(input: String) -> Result<Vec<Token>, String> {
