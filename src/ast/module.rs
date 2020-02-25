@@ -1,5 +1,5 @@
-use crate::code::instruction::Expression;
-use crate::code::types::{MemType, FuncType, ValType};
+use crate::ast::instruction::Expression;
+use crate::ast::types::{MemType, FuncType, ValType};
 
 // https://webassembly.github.io/spec/core/syntax/modules.html
 pub struct Module {

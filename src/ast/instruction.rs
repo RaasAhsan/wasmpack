@@ -1,5 +1,5 @@
-use crate::code::module::{LocalIndex, GlobalIndex, LabelIndex, FuncIndex, TypeIndex};
-use crate::code::types::ResultType;
+use crate::ast::module::{LocalIndex, GlobalIndex, LabelIndex, FuncIndex, TypeIndex};
+use crate::ast::types::ResultType;
 
 // WebAssembly code consists of sequences of instructions.
 // https://webassembly.github.io/spec/core/syntax/instructions.html
