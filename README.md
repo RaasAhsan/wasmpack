@@ -6,3 +6,4 @@ A collection of tools for working with WebAssembly. Planned features:
 3. Java bytecode target
 4. LLVM target
 5. JavaScript target
+6. x86_64 jit compiler

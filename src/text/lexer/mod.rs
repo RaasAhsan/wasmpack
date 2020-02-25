@@ -36,9 +36,9 @@ impl State {
 
 }
 
-pub fn lex(input: String) -> Result<Vec<Token>, String> {
+pub fn lex(input: &String) -> Result<Vec<Token>, String> {
     let mut state = State {
-        input: input.clone(),
+        input: input.to_string(),
         cursor: 0
     };
 
@@ -66,9 +66,25 @@ pub fn lex(input: String) -> Result<Vec<Token>, String> {
     }
 
     if no_match {
+        // TODO: Use a well-defined enum error hierarchy to capture errors
         Err("Token not matched".to_string())
     } else {
         Ok(tokens)
+    }
+}
+
+
+fn choose<A>(current: Lex<A>, next: Lex<A>) -> Lex<A> {
+    match current {
+        None => next,
+        Some(c) => match next {
+            None => Some(c),
+            Some(n) => if c.1 >= n.1 {
+                Some(c)
+            } else {
+                Some(n)
+            }
+        }
     }
 }
 
@@ -81,20 +97,6 @@ fn lex_space(state: &State) -> Lex<()> {
         Some(mat) => {
             let str = mat.as_str();
             Some(((), str.len()))
-        }
-    }
-}
-
-fn choose<A>(current: Lex<A>, next: Lex<A>) -> Lex<A> {
-    match current {
-        None => next,
-        Some(c) => match next {
-            None => Some(c),
-            Some(n) => if c.1 >= n.1 {
-                Some(c)
-            } else {
-                Some(n)
-            }
         }
     }
 }
